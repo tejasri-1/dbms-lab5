@@ -1,0 +1,5 @@
+PGUSER=test
+PGPASSWORD=test
+PGHOST=localhost
+PGPORT=5432
+PGDATABASE=splitwise
