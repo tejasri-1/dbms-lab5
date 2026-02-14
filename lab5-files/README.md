@@ -49,12 +49,18 @@ b)\dt
 c)\q
 
 ---------Do backedn setup as in doc----------------
------------Do frontend setup as in doc-------------------
----------------Run the application as told in doc----------------
+
+---------Do frontend setup as in doc---------------
+
+---------Run the application as in doc-------------
 (in running for windows: instead of source env):
 $env:PGUSER="test"
 $env:PGPASSWORD="test"
 $env:PGHOST="localhost"
 $env:PGPORT="5432"
 $env:PGDATABASE="splitwise"
+
+
+----------------Things to do----------
+while creating and storing variables for login or signup use these names only:username, email,password
 

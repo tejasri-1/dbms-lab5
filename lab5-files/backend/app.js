@@ -11,7 +11,25 @@ const port = 4000;
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
 
-// do the db connection as done in the previous lab
+// 1.do the db connection as done in the previous lab
+const {Pool,Client } = require('pg')
+require('dotenv').config();
+
+//Global variable to store database credentials
+let dbConfig = null;
+let pool = null;
+
+if(process.env.DB_HOST && process.env.DB_PORT && process.env.DB_NAME && process.env.DB_PASSWORD && process.env.DB_USER) {
+  dbConfig = {
+    host : process.env.DB_HOST,
+    port : parseInt(process.env.DB_PORT),
+    database : process.env.DB_NAME,
+    user : process.env.DB_USER,
+    password : process.env.DB_PASSWORD
+  };
+  pool = new Pool(dbConfig);
+  console.log("Database configured and a pool is created");
+}
 
 // CORS
 app.use(cors({
@@ -31,6 +49,10 @@ app.use(session({
 // Redirect unauthenticated users to the login page with respective status code
 function checkAuth(req, res, next) {
   // TODO
+  console.log("Session checking:",req.session.user);
+  if(!req.session.user) {
+    return res.redirect("/login");
+  }
 }
 
 // TODO: Implement balance update logic
@@ -47,11 +69,98 @@ async function updateBalance(client, payerId, debtorId, amount) {
 // use correct status codes and messages mentioned in the lab document
 app.post('/signup', async (req, res) => {
   // TODO
+  try {
+  const {username,email,password }= req.body;
+
+  //validating input 
+  if(!username || !email || !password) {
+    return res.status(400).json({
+      message: "ALL fields are required"
+    });
+  }
+
+  //hashing password 
+  const hashedpassword = await bcrypt.hash(password,10);
+
+  //inserting into Database 
+/*
+React sends signup data
+        ↓
+Express inserts into DB
+        ↓
+Postgres generates user_id
+        ↓
+RETURNING gives us that id
+        ↓
+Server sends JSON back
+        ↓
+React receives success response
+*/
+  const result = await pool.query(
+    `Insert into users (username,email,password_hash) values ($1,$2,$3) returning user_id,username`,[username,email,hashedpassword]
+  );
+
+  const user = result.rows[0];
+
+  res.status(201).json({
+    user_id : user.user_id,
+    username : user.username
+  });
+}
+catch (err) {
+  console.error(err);
+  //23505 = unique constraint violation
+  if(err.code =='23505'){
+    return res.status(400).json ({
+      message: "Username already exists"
+    });
+  }
+
+  res.status(500).json ({
+    message : "Server error"
+  });
+
+}
+
 });
 
 // TODO: Implement user login logic
 app.post('/login', async (req, res) => {
   // TODO
+  try {
+    const {username,password} = req.body;
+
+    if(!username || !password) {
+      res.status(401).json ({
+        message : "Invalid Credentials"
+      });
+    }
+
+    const result = await pool.query("Select user_id,username,password from users where username=$1 and password=$1",[username,password]);
+    if(result.rows.length ==0) {
+      res.status(400).json ({
+        message : "User Not Found"
+      })
+    }
+
+    const userrow = result.rows[0];
+
+    //store login credentials 
+    res.session.user = {
+      user_id : userrow.user_id,
+      username : username.username
+    }
+    res.status(200).json ({
+      message:"Login successful",
+      user :{
+        user_id: userrow.user_id,
+        username : userrow.username
+      }
+    })
+  }
+  catch(err) {
+    console.error(err);
+  }
 });
 
 // TODO: Check if user is logged in
