@@ -25,7 +25,28 @@ function App() {
   // 3. Stop the loading state
   useEffect(() => {
     const checkLoginStatus = async () => {
-      // Implement API call here
+      try {
+        const res = await fetch('http://localhost:4000/isLoggedIn', {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.loggedIn && data.user) {
+            setUser(data.user);
+          } else {
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error('Failed to check login status', err);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
     };
     checkLoginStatus();
   }, []);
@@ -35,7 +56,8 @@ function App() {
   // 1. Update user state
   // 2. Redirect to dashboard
   const handleLogin = (userData) => {
-    // Implement login logic here
+    setUser(userData);
+    navigate('/');
   };
 
   // TODO: Handle logout functionality
@@ -44,12 +66,22 @@ function App() {
   // 2. Clear user state
   // 3. Redirect to login page
   const handleLogout = async () => {
-    // Implement logout logic here
+    try {
+      await fetch('http://localhost:4000/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+    } catch (err) {
+      console.error('Logout failed', err);
+    } finally {
+      setUser(null);
+      navigate('/login');
+    }
   };
 
   // TODO: Show a loading indicator while authentication is being checked
   if (loading) {
-    return <div>{/* Implement loading UI here */}</div>;
+    return <div className="container">Checking session...</div>;
   }
 
   return (
@@ -58,13 +90,17 @@ function App() {
       {user && (
         <nav className="container">
           <div className="logo">
-            {/* Display application name and username */}
+            <span className="app-name">Expense Splitter</span>
+            <span className="welcome">Hello, {user.username}</span>
           </div>
 
           <div className="nav-links">
-            {/* TODO: Add navigation links */}
-            {/* Dashboard, Groups, Friends */}
-            {/* Add logout button */}
+            <Link to="/">Dashboard</Link>
+            <Link to="/groups">Groups</Link>
+            <Link to="/friends">Friends</Link>
+            <button type="button" onClick={handleLogout}>
+              Logout
+            </button>
           </div>
         </nav>
       )}
@@ -73,17 +109,54 @@ function App() {
         {/* TODO: Configure application routes */}
         <Routes>
           {/* Login route (only accessible when logged out) */}
-          <Route path="/login" element={
-            /* Implement conditional routing here */
-            <div />
-          } />
+          <Route
+            path="/login"
+            element={
+              user ? (
+                <Navigate to="/" replace />
+              ) : (
+                <Login onLogin={handleLogin} />
+              )
+            }
+          />
 
           {/* Protected routes (only accessible when logged in) */}
-          <Route path="/" element={<div />} />
-          <Route path="/groups" element={<div />} />
-          <Route path="/groups/create" element={<div />} />
-          <Route path="/group/:id" element={<div />} />
-          <Route path="/friends" element={<div />} />
+          <Route
+            path="/"
+            element={
+              user ? <Dashboard user={user} /> : <Navigate to="/login" replace />
+            }
+          />
+          <Route
+            path="/groups"
+            element={
+              user ? <Groups /> : <Navigate to="/login" replace />
+            }
+          />
+          <Route
+            path="/groups/create"
+            element={
+              user ? <CreateGroup /> : <Navigate to="/login" replace />
+            }
+          />
+          <Route
+            path="/group/:id"
+            element={
+              user ? <GroupDetails user={user} /> : <Navigate to="/login" replace />
+            }
+          />
+          <Route
+            path="/friends"
+            element={
+              user ? <Friends /> : <Navigate to="/login" replace />
+            }
+          />
+          <Route
+            path="*"
+            element={
+              <Navigate to={user ? '/' : '/login'} replace />
+            }
+          />
         </Routes>
       </div>
     </div>

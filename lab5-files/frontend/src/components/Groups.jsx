@@ -14,24 +14,55 @@ function Groups() {
     // - Update groups state
     // - Handle error cases
     const fetchData = () => {
-        // Implement logic here
+        const load = async () => {
+            try {
+                const res = await fetch('http://localhost:4000/groups', {
+                    credentials: 'include',
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    setGroups(data || []);
+                } else {
+                    console.error('Failed to load groups');
+                }
+            } catch (err) {
+                console.error('Error loading groups', err);
+            }
+        };
+
+        load();
     };
 
     // TODO: Fetch group list on component mount
     useEffect(() => {
-        // Call fetchData here
+        fetchData();
     }, []);
 
     return (
-        <>
-            {/*
-              TODO: Implement JSX for Groups page
-              - Display list of groups
-              - Show "Create New Group" button
-              - Navigate to /groups/create on button click
-              - Show empty-state message when no groups exist
-            */}
-        </>
+        <div className="groups-page">
+            <h2>Groups</h2>
+
+            <button
+                type="button"
+                className="primary-btn"
+                onClick={() => navigate('/groups/create')}
+            >
+                Create New Group
+            </button>
+
+            {groups.length === 0 ? (
+                <p>You are not part of any groups yet.</p>
+            ) : (
+                <ul className="groups-list">
+                    {groups.map((g) => (
+                        <li key={g.group_id} className="group-item">
+                            <Link to={`/group/${g.group_id}`}>{g.name}</Link>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
     );
 }
 
