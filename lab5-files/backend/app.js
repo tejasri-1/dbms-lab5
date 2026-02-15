@@ -20,20 +20,17 @@ const {Pool,Client } = require('pg')
 let dbConfig = null;
 let pool = null;
 
-if(process.env.DB_HOST && process.env.DB_PORT && process.env.DB_NAME && process.env.DB_PASSWORD && process.env.DB_USER) {
+if (process.env.PGHOST && process.env.PGPORT && process.env.PGDATABASE &&
+    process.env.PGPASSWORD && process.env.PGUSER) {
   dbConfig = {
-    host : process.env.DB_HOST,
-    port : parseInt(process.env.DB_PORT),
-    database : process.env.DB_NAME,
-    user : process.env.DB_USER,
-    password : process.env.DB_PASSWORD
+    host: process.env.PGHOST,
+    port: parseInt(process.env.PGPORT),
+    database: process.env.PGDATABASE,
+    user: process.env.PGUSER,
+    password: process.env.PGPASSWORD,
   };
   pool = new Pool(dbConfig);
-
   console.log("Database configured and a pool is created");
-  if (!pool) {
-    console.error("Database pool not created. Check .env variables.");
-  }
 }
 
 // CORS
@@ -65,7 +62,30 @@ function checkAuth(req, res, next) {
 // This function will be used to update balances 
 // while adding expenses and settlements
 async function updateBalance(client, payerId, debtorId, amount) {
-  // TODO
+  console.log('updateBalance called with', { payerId, debtorId, amount });
+
+  // payerId has a claim of `amount` on debtorId.
+  // Balance(user_id, other_user_id, amount):
+  //   +ve => other_user owes user
+  //   -ve => user owes other_user
+
+  // Update payer's perspective
+  await client.query(
+    `INSERT INTO Balance (user_id, other_user_id, amount)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (user_id, other_user_id)
+     DO UPDATE SET amount = Balance.amount + EXCLUDED.amount`,
+    [payerId, debtorId, amount]
+  );
+
+  // Update debtor's opposite perspective
+  await client.query(
+    `INSERT INTO Balance (user_id, other_user_id, amount)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (user_id, other_user_id)
+     DO UPDATE SET amount = Balance.amount + EXCLUDED.amount`,
+    [debtorId, payerId, -amount]
+  );
 }
 
 // ---------------- AUTH ROUTES ----------------
@@ -210,17 +230,110 @@ app.post('/logout', (req, res) => {
 
 // TODO: Search users by username (excluding current user)
 app.get('/users/search', checkAuth, async (req, res) => {
-  // TODO
+  try {
+    const currentUserId = req.session.user.user_id;
+    const q = (req.query.q || '').toString().trim();
+    console.log('GET /users/search', { currentUserId, q });
+
+    if (!q) {
+      return res.json([]);
+    }
+
+    const result = await pool.query(
+      `SELECT user_id, username
+       FROM Users
+       WHERE username ILIKE $1 AND user_id <> $2
+       ORDER BY username
+       LIMIT 20`,
+      [`%${q}%`, currentUserId]
+    );
+
+    console.log('Search results count:', result.rowCount);
+    return res.status(200).json(result.rows);
+  } catch (err) {
+    console.error('Error searching users', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
 });
 
 // TODO: Add a friend (bidirectional)
 app.post('/friends/add', checkAuth, async (req, res) => {
-  // TODO
+  const currentUserId = req.session.user.user_id;
+  const { friend_id } = req.body;
+  console.log('POST /friends/add', { currentUserId, friend_id });
+
+  const friendIdNum = parseInt(friend_id, 10);
+  if (!friendIdNum || Number.isNaN(friendIdNum)) {
+    return res.status(400).json({ message: 'Invalid friend_id' });
+  }
+
+  if (friendIdNum === currentUserId) {
+    return res.status(400).json({ message: 'Cannot add yourself as friend' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Ensure the friend user exists
+    const userCheck = await client.query(
+      'SELECT user_id FROM Users WHERE user_id = $1',
+      [friendIdNum]
+    );
+
+    if (userCheck.rowCount === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Insert friendship in both directions
+    await client.query(
+      `INSERT INTO Friend (user_id, friend_id)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, friend_id) DO NOTHING`,
+      [currentUserId, friendIdNum]
+    );
+
+    await client.query(
+      `INSERT INTO Friend (user_id, friend_id)
+       VALUES ($1, $2)
+       ON CONFLICT (user_id, friend_id) DO NOTHING`,
+      [friendIdNum, currentUserId]
+    );
+
+    await client.query('COMMIT');
+    console.log('Friendship created between', currentUserId, friendIdNum);
+    return res.status(201).json({ message: 'Friend added' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error adding friend', err);
+    return res.status(500).json({ message: 'Server error' });
+  } finally {
+    client.release();
+  }
 });
 
 // TODO: Fetch friend list of logged-in user
 app.get('/friends', checkAuth, async (req, res) => {
-  // TODO
+  try {
+    const currentUserId = req.session.user.user_id;
+    console.log('GET /friends for user', currentUserId);
+
+    const result = await pool.query(
+      `SELECT u.user_id, u.username
+       FROM Friend f
+       JOIN Users u ON u.user_id = f.friend_id
+       WHERE f.user_id = $1
+       ORDER BY u.username`,
+      [currentUserId]
+    );
+
+    console.log('Friends count:', result.rowCount);
+    return res.status(200).json(result.rows);
+  } catch (err) {
+    console.error('Error fetching friends', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
 });
 
 // ---------------- GROUP ROUTES ----------------
@@ -256,18 +369,76 @@ app.get('/groups/:id/expenses', checkAuth, async (req, res) => {
 
 // TODO: Settle balance between two users
 app.post('/settle', checkAuth, async (req, res) => {
-  // TODO
-  // 1. Record settlement
-  // 2. Update Balance
+  const fromUserId = req.session.user.user_id;
+  const { to_user, amount } = req.body;
+  console.log('POST /settle', { fromUserId, to_user, amount });
+
+  const toUserId = parseInt(to_user, 10);
+  const amt = parseFloat(amount);
+
+  if (!toUserId || Number.isNaN(toUserId)) {
+    return res.status(400).json({ message: 'Invalid to_user' });
+  }
+
+  if (toUserId === fromUserId) {
+    return res.status(400).json({ message: 'Cannot settle with yourself' });
+  }
+
+  if (!amt || Number.isNaN(amt) || amt <= 0) {
+    return res.status(400).json({ message: 'Invalid amount' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Record settlement
+    await client.query(
+      `INSERT INTO Settlement (from_user, to_user, amount)
+       VALUES ($1, $2, $3)`,
+      [fromUserId, toUserId, amt]
+    );
+
+    // 2. Update Balance
     // from_user (Debtor) PAYS to_user (Creditor).
-    // to_user's claim on from_user REDUCES. ('amount' in updateBalance is logic for INCREASE).
-    // So we pass NEGATIVE amount to updateBalance(Creditor, Debtor, -amount).
+    // Creditor's claim on debtor REDUCES by amt,
+    // so pass NEGATIVE amt to updateBalance.
+    await updateBalance(client, toUserId, fromUserId, -amt);
+
+    await client.query('COMMIT');
+    console.log('Settlement recorded and balances updated');
+    return res.status(201).json({ message: 'Settlement recorded' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error processing settlement', err);
+    return res.status(500).json({ message: 'Server error' });
+  } finally {
+    client.release();
+  }
 
 });
 
 // TODO: Fetch balances of logged-in user
 app.get('/balances', checkAuth, async (req, res) => {
-  // TODO
+  try {
+    const currentUserId = req.session.user.user_id;
+    console.log('GET /balances for user', currentUserId);
+
+    const result = await pool.query(
+      `SELECT b.other_user_id, u.username, b.amount
+       FROM Balance b
+       JOIN Users u ON u.user_id = b.other_user_id
+       WHERE b.user_id = $1 AND b.amount <> 0
+       ORDER BY u.username`,
+      [currentUserId]
+    );
+
+    console.log('Balances count:', result.rowCount);
+    return res.status(200).json(result.rows);
+  } catch (err) {
+    console.error('Error fetching balances', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
 });
 
 app.listen(port, () => {
@@ -278,4 +449,3 @@ app.listen(port, () => {
 
 
 
- 
