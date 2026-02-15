@@ -17,116 +17,71 @@ function Login({ onLogin }) {
     // - Handle success:
     //   - Call onLogin with user data
     // - Handle error responses
+    /*
+    e = event object. When user types in input, browser creates an event. React passes that event into this function.
+    ... Spread operator. Means: Copy all properties of formData into this new object.
+    e.target : The element that triggered the event.
+    e.target.name : The value of the input's name attribute.
+    Example: if <input name="username" /> Then:  e.target.name === "username"
+    */
+    const handleChange = (e) => { 
+        setFormData({...formData, [e.target.name] : e.target.value });
+    };
+    
+    /*
+    fetch(url, options) : url → where to send request, options → how to send request . It returns a Promise that resolves to a Response object.
+    In App.jsx, you had: <Login onLogin={handleLogin} /> That means: Pass the function handleLogin into the Login component And inside Login, call it onLogin
+    */
+    
     const handleSubmit = async (e) => {
+        // Implement logic here  
         e.preventDefault();
-        setError('');
+        setError('');  // clears previous error message. Set error state to empty string.
+        console.log("Submitting form: ", formData);
 
-        const endpoint = isSignup ? '/signup' : '/login';
-
+        const endpoint = isSignup ? 'http://localhost:4000/signup' : 'http://localhost:4000/login';
         try {
-            const res = await fetch(`http://localhost:4000${endpoint}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
+            const res = await fetch(endpoint, {
+                method : 'POST', //send data to backend
+                headers : {
+                    'Content-type' : 'application/json'
                 },
-                credentials: 'include',
-                body: JSON.stringify({
-                    username: formData.username,
-                    password: formData.password,
-                    ...(isSignup ? { email: formData.email } : {}),
-                }),
+                credentials : 'include',
+                body : JSON.stringify(formData) //https req body must be a string or binary data, so we stringify our json data
             });
 
-            const data = await res.json().catch(() => ({}));
-
-            if (!res.ok) {
-                setError(data.message || 'Request failed');
+            const data = await res.json();
+            if(!res.ok) {
+                console.error("Authentication failed: ",data);
+                setError(data.message || 'Something went wrong');
                 return;
             }
-
-            // /login returns { message, user }, /signup returns user object
-            const userObj = data.user || data;
-            if (!userObj || !userObj.user_id) {
-                setError('Unexpected response from server');
-                return;
-            }
-
-            onLogin(userObj);
-        } catch (err) {
-            console.error('Auth failed', err);
-            setError('Something went wrong. Please try again.');
+            console.log("Authentication success:",data);
+            onLogin(data);
+        }
+        catch (err) {
+            console.error("Server error:",err);
+            setError('Server error. please try again.');
         }
     };
 
     return (
-        <div className="auth-page">
-            <h2>{isSignup ? 'Sign Up' : 'Login'}</h2>
+       <div className="login-container">
+        <h2>{isSignup ? 'Create Account' : 'Login'}</h2>
+        {error && <p style={{color:'red'}}> {error}</p>}
 
-            {error && <div className="error">{error}</div>}
+        <form onSubmit={handleSubmit}>
+            <input type="text" name="username" placeholder="Username" value={formData.username} onChange={handleChange} required />
+            {isSignup &&   <input type="email" name="email" placeholder="Email" value={formData.email} onChange={handleChange} required/>}
+            <input type="password" name="password" placeholder="Password" value={formData.password} onChange={handleChange} required/>
+            <button type="submit"> {isSignup? 'Sign Up':'Login'} </button>
+        </form>
 
-            <form onSubmit={handleSubmit} className="auth-form">
-                <div className="form-group">
-                    <label htmlFor="username">Username</label>
-                    <input
-                        id="username"
-                        name="username"
-                        type="text"
-                        value={formData.username}
-                        onChange={(e) =>
-                            setFormData({ ...formData, username: e.target.value })
-                        }
-                        required
-                    />
-                </div>
+        <p> {isSignup? "Already have an account?": "Need an account?"}
+        <button onClick={()=> setIsSignup(!isSignup)}>{isSignup? 'Login': 'Sign up'}</button> 
+        </p>
 
-                {isSignup && (
-                    <div className="form-group">
-                        <label htmlFor="email">Email</label>
-                        <input
-                            id="email"
-                            name="email"
-                            type="email"
-                            value={formData.email}
-                            onChange={(e) =>
-                                setFormData({ ...formData, email: e.target.value })
-                            }
-                            required
-                        />
-                    </div>
-                )}
-
-                <div className="form-group">
-                    <label htmlFor="password">Password</label>
-                    <input
-                        id="password"
-                        name="password"
-                        type="password"
-                        value={formData.password}
-                        onChange={(e) =>
-                            setFormData({ ...formData, password: e.target.value })
-                        }
-                        required
-                    />
-                </div>
-
-                <button type="submit" className="primary-btn">
-                    {isSignup ? 'Sign Up' : 'Login'}
-                </button>
-            </form>
-
-            <button
-                type="button"
-                className="link-button"
-                onClick={() => {
-                    setIsSignup(!isSignup);
-                    setError('');
-                }}
-           >
-                {isSignup
-                    ? 'Already have an account? Login'
-                    : "Don't have an account? Sign Up"}
-            </button>
-        </div>
+       </div>
     );
 }
 

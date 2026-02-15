@@ -1,9 +1,10 @@
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
-const db = require('./db');
+
 
 const app = express();
 const port = 4000;
@@ -13,7 +14,7 @@ app.use(express.json());
 
 // 1.do the db connection as done in the previous lab
 const {Pool,Client } = require('pg')
-require('dotenv').config();
+
 
 //Global variable to store database credentials
 let dbConfig = null;
@@ -28,7 +29,11 @@ if(process.env.DB_HOST && process.env.DB_PORT && process.env.DB_NAME && process.
     password : process.env.DB_PASSWORD
   };
   pool = new Pool(dbConfig);
+
   console.log("Database configured and a pool is created");
+  if (!pool) {
+    console.error("Database pool not created. Check .env variables.");
+  }
 }
 
 // CORS
@@ -51,8 +56,9 @@ function checkAuth(req, res, next) {
   // TODO
   console.log("Session checking:",req.session.user);
   if(!req.session.user) {
-    return res.redirect("/login");
+    return res.status(401).json({ message: "Not authenticated" });
   }
+  next();
 }
 
 // TODO: Implement balance update logic
@@ -97,7 +103,7 @@ Server sends JSON back
 React receives success response
 */
   const result = await pool.query(
-    `Insert into users (username,email,password_hash) values ($1,$2,$3) returning user_id,username`,[username,email,hashedpassword]
+    `INSERT INTO Users (username,email,password_hash) values ($1,$2,$3) returning user_id,username`,[username,email,hashedpassword]
   );
 
   const user = result.rows[0];
@@ -131,26 +137,35 @@ app.post('/login', async (req, res) => {
     const {username,password} = req.body;
 
     if(!username || !password) {
-      res.status(401).json ({
+      return res.status(401).json ({
         message : "Invalid Credentials"
       });
     }
 
-    const result = await pool.query("Select user_id,username,password from users where username=$1 and password=$1",[username,password]);
+    const result = await pool.query("Select user_id,username,password_hash from Users where username=$1",[username]);
     if(result.rows.length ==0) {
-      res.status(400).json ({
+       return res.status(400).json ({
         message : "User Not Found"
       })
     }
 
     const userrow = result.rows[0];
 
-    //store login credentials 
-    res.session.user = {
-      user_id : userrow.user_id,
-      username : username.username
+    const match = await bcrypt.compare(password,userrow.password_hash);
+    if(!match) {
+      return res.status(401).json({
+        message :"Invalid credentials"
+      });
     }
-    res.status(200).json ({
+
+    //store login credentials 
+    req.session.user = {
+      user_id : userrow.user_id,
+      username : userrow.username
+    }
+    console.log("Session is set for : ", req.session.user);
+
+    return res.status(200).json ({
       message:"Login successful",
       user :{
         user_id: userrow.user_id,
@@ -166,11 +181,29 @@ app.post('/login', async (req, res) => {
 // TODO: Check if user is logged in
 app.get('/isLoggedIn', (req, res) => {
   // TODO
+  if(req.session.user) {
+    res.status(200).json ({
+      loggedIn : true,
+      user : {
+        user_id : req.session.user.user_id,
+        username : req.session.user.username
+      }
+    })
+  }
+
+  return res.status(200).json({
+    loggedIn : false
+  })
+  
 });
 
 // TODO: Implement logout functionality
 app.post('/logout', (req, res) => {
   // TODO
+  req.session.destroy();
+  res.status(200).json ({
+    message :"Logged out"
+  })
 });
 
 // ---------------- FRIENDS ROUTES ----------------

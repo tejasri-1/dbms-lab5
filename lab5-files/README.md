@@ -54,11 +54,12 @@ c)\q
 
 ---------Run the application as in doc-------------
 (in running for windows: instead of source env):
-$env:PGUSER="test"
-$env:PGPASSWORD="test"
-$env:PGHOST="localhost"
-$env:PGPORT="5432"
-$env:PGDATABASE="splitwise"
+$env:DB_USER="test"
+$env:DB_PASSWORD="test"
+$env:DB_HOST="localhost"
+$env:DB_PORT="5432"
+$env:DB_NAME="splitwise"
+
 
 
 ----------------Things to do----------

@@ -24,29 +24,36 @@ function App() {
   // 2. If logged in, store user data in state
   // 3. Stop the loading state
   useEffect(() => {
+    console.log("Checking login status");
     const checkLoginStatus = async () => {
+      // TODO : Implement API call here
       try {
-        const res = await fetch('http://localhost:4000/isLoggedIn', {
-          method: 'GET',
-          credentials: 'include',
-        });
 
-        if (res.ok) {
-          const data = await res.json();
-          if (data.loggedIn && data.user) {
-            setUser(data.user);
-          } else {
-            setUser(null);
-          }
-        } else {
-          setUser(null);
-        }
-      } catch (err) {
-        console.error('Failed to check login status', err);
+        const res = await fetch('http://localhost:4000/api/auth/me', {credentials: 'include'}); //fetch: “Call my backend server at this endpoint.” 
+        /* This is a common REST pattern.
+            /api → backend API namespace
+            /auth → authentication-related routes
+            /me → “give me the currently logged in user”
+            credentials : 'include' ---meaning also fetch cookies(in web mostly),authorization headers, tls client certificates
+        */
+       if(res.ok) {
+        const data = await res.json();
+        console.log("User is logged in : ",data);
+        setUser(data);
+       }
+       else {
+        console.log("No active session found");
         setUser(null);
-      } finally {
-        setLoading(false);
+       }       
       }
+      catch (err) {
+        console.error("Error checking login status: ",err);
+      }
+      finally {
+        setLoading(false);
+        console.log("Auth check complete.");
+      }
+
     };
     checkLoginStatus();
   }, []);
@@ -56,6 +63,8 @@ function App() {
   // 1. Update user state
   // 2. Redirect to dashboard
   const handleLogin = (userData) => {
+    // Implement login logic here
+    console.log("Login successful. Updating state: ",userData);
     setUser(userData);
     navigate('/');
   };
@@ -66,22 +75,27 @@ function App() {
   // 2. Clear user state
   // 3. Redirect to login page
   const handleLogout = async () => {
+    // Implement logout logic here
+    console.log("Logging out----");
     try {
-      await fetch('http://localhost:4000/logout', {
+      await fetch('http://localhost:4000/api/logout', {
         method: 'POST',
-        credentials: 'include',
+        credentials :'include'
       });
-    } catch (err) {
-      console.error('Logout failed', err);
-    } finally {
+
       setUser(null);
+      console.log("Logout succesful.");
       navigate('/login');
+    }
+    catch (err) {
+      console.error("Logout error: ",err);
     }
   };
 
   // TODO: Show a loading indicator while authentication is being checked
   if (loading) {
-    return <div className="container">Checking session...</div>;
+    console.log("Still checking auth........");
+    return <div>Loading authentication status...</div>;
   }
 
   return (
@@ -90,17 +104,18 @@ function App() {
       {user && (
         <nav className="container">
           <div className="logo">
-            <span className="app-name">Expense Splitter</span>
-            <span className="welcome">Hello, {user.username}</span>
+            {/* Display application name and username */}
+            <strong>SplitApp</strong> | Welcome {user.username}
           </div>
 
           <div className="nav-links">
-            <Link to="/">Dashboard</Link>
+            {/* TODO: Add navigation links */}
+            {/* Dashboard, Groups, Friends */}
+            {/* Add logout button */}
+            <Link to='/'>Dashboard</Link>
             <Link to="/groups">Groups</Link>
             <Link to="/friends">Friends</Link>
-            <button type="button" onClick={handleLogout}>
-              Logout
-            </button>
+            <button onClick={handleLogout}>Logout</button>
           </div>
         </nav>
       )}
@@ -109,54 +124,17 @@ function App() {
         {/* TODO: Configure application routes */}
         <Routes>
           {/* Login route (only accessible when logged out) */}
-          <Route
-            path="/login"
-            element={
-              user ? (
-                <Navigate to="/" replace />
-              ) : (
-                <Login onLogin={handleLogin} />
-              )
-            }
-          />
+          <Route path="/login" element={
+            /* Implement conditional routing here */
+            user ? <Navigate to='/' replace/> : <Login onLogin={handleLogin}/> /*If a logged-in user tries:/login . We redirect to /. If we don’t use replace, pressing the back button will go back to /login. With replace, back button won’t take them to login. */
+          } />
 
           {/* Protected routes (only accessible when logged in) */}
-          <Route
-            path="/"
-            element={
-              user ? <Dashboard user={user} /> : <Navigate to="/login" replace />
-            }
-          />
-          <Route
-            path="/groups"
-            element={
-              user ? <Groups /> : <Navigate to="/login" replace />
-            }
-          />
-          <Route
-            path="/groups/create"
-            element={
-              user ? <CreateGroup /> : <Navigate to="/login" replace />
-            }
-          />
-          <Route
-            path="/group/:id"
-            element={
-              user ? <GroupDetails user={user} /> : <Navigate to="/login" replace />
-            }
-          />
-          <Route
-            path="/friends"
-            element={
-              user ? <Friends /> : <Navigate to="/login" replace />
-            }
-          />
-          <Route
-            path="*"
-            element={
-              <Navigate to={user ? '/' : '/login'} replace />
-            }
-          />
+          <Route path="/" element={ user ? <Dashboard /> : <Navigate to="/login" replace />} /> 
+          <Route path="/groups" element={ user ? <Groups /> : <Navigate to="/login" replace />} />
+          <Route path="/groups/create" element={ user ? <CreateGroup /> : <Navigate to="/login" replace/>} />
+          <Route path="/group/:id" element={user ? <GroupDetails/>: <Navigate to="/login" replace/>} />
+          <Route path="/friends" element={user ? <Friends /> : <Navigate to="/login" replace/>} />
         </Routes>
       </div>
     </div>
