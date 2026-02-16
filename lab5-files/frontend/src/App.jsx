@@ -24,36 +24,29 @@ function App() {
   // 2. If logged in, store user data in state
   // 3. Stop the loading state
   useEffect(() => {
-    console.log("Checking login status");
     const checkLoginStatus = async () => {
-      // TODO : Implement API call here
       try {
+        const res = await fetch('http://localhost:4000/isLoggedIn', {
+          method: 'GET',
+          credentials: 'include',
+        });
 
-        const res = await fetch('http://localhost:4000/api/auth/me', {credentials: 'include'}); //fetch: “Call my backend server at this endpoint.” 
-        /* This is a common REST pattern.
-            /api → backend API namespace
-            /auth → authentication-related routes
-            /me → “give me the currently logged in user”
-            credentials : 'include' ---meaning also fetch cookies(in web mostly),authorization headers, tls client certificates
-        */
-       if(res.ok) {
-        const data = await res.json();
-        console.log("User is logged in : ",data);
-        setUser(data);
-       }
-       else {
-        console.log("No active session found");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.loggedIn && data.user) {
+            setUser(data.user);
+          } else {
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+      } catch (err) {
+        console.error('Failed to check login status', err);
         setUser(null);
-       }       
-      }
-      catch (err) {
-        console.error("Error checking login status: ",err);
-      }
-      finally {
+      } finally {
         setLoading(false);
-        console.log("Auth check complete.");
       }
-
     };
     checkLoginStatus();
   }, []);
@@ -63,9 +56,9 @@ function App() {
   // 1. Update user state
   // 2. Redirect to dashboard
   const handleLogin = (userData) => {
-    // Implement login logic here
-    console.log("Login successful. Updating state: ",userData);
-    setUser(userData);
+    // backend returns { message, user: { user_id, username } }
+    console.log('Login successful. Updating state: ', userData);
+    setUser(userData.user || null);
     navigate('/');
   };
 
@@ -78,7 +71,7 @@ function App() {
     // Implement logout logic here
     console.log("Logging out----");
     try {
-      await fetch('http://localhost:4000/api/logout', {
+      await fetch('http://localhost:4000/logout', {
         method: 'POST',
         credentials :'include'
       });
@@ -105,7 +98,8 @@ function App() {
         <nav className="container">
           <div className="logo">
             {/* Display application name and username */}
-            <strong>SplitApp</strong> | Welcome {user.username}
+            <strong>SplitApp</strong>
+            <span className="welcome">Welcome {user.username}</span>
           </div>
 
           <div className="nav-links">

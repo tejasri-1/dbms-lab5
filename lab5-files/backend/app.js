@@ -48,28 +48,24 @@ app.use(session({
 }));
 
 // TODO: Implement authentication middleware
-// Redirect unauthenticated users to the login page with respective status code
+// Redirect unauthenticated users with proper status
 function checkAuth(req, res, next) {
-  // TODO
-  console.log("Session checking:",req.session.user);
-  if(!req.session.user) {
-    return res.status(401).json({ message: "Not authenticated" });
+  console.log('Session checking:', req.session.user);
+  if (!req.session.user) {
+    return res.status(401).json({ message: 'Not authenticated' });
   }
   next();
 }
 
-// TODO: Implement balance update logic
-// This function will be used to update balances 
-// while adding expenses and settlements
+// Balance(user_id, other_user_id, amount):
+// +ve -> other_user owes user
+// -ve -> user owes other_user
 async function updateBalance(client, payerId, debtorId, amount) {
   console.log('updateBalance called with', { payerId, debtorId, amount });
 
   // payerId has a claim of `amount` on debtorId.
-  // Balance(user_id, other_user_id, amount):
-  //   +ve => other_user owes user
-  //   -ve => user owes other_user
 
-  // Update payer's perspective
+  // payer's perspective
   await client.query(
     `INSERT INTO Balance (user_id, other_user_id, amount)
      VALUES ($1, $2, $3)
@@ -78,7 +74,7 @@ async function updateBalance(client, payerId, debtorId, amount) {
     [payerId, debtorId, amount]
   );
 
-  // Update debtor's opposite perspective
+  // debtor's opposite perspective
   await client.query(
     `INSERT INTO Balance (user_id, other_user_id, amount)
      VALUES ($1, $2, $3)
@@ -340,29 +336,239 @@ app.get('/friends', checkAuth, async (req, res) => {
 
 // TODO: Create a new group and add members
 app.post('/groups', checkAuth, async (req, res) => {
-  // TODO
+  const currentUserId = req.session.user.user_id;
+  const { name, member_ids } = req.body || {};
+
+  const groupName = (name || '').toString().trim();
+  if (!groupName) {
+    return res.status(400).json({ message: 'Group name is required' });
+  }
+
+  // Normalise member IDs to integers
+  const rawMembers = Array.isArray(member_ids) ? member_ids : [];
+  const memberIds = rawMembers
+    .map((id) => parseInt(id, 10))
+    .filter((id) => !Number.isNaN(id));
+
+  // Ensure the creator is also a member of the group
+  if (!memberIds.includes(currentUserId)) {
+    memberIds.push(currentUserId);
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const groupRes = await client.query(
+      `INSERT INTO Groups (name, created_by)
+       VALUES ($1, $2)
+       RETURNING group_id, name` ,
+      [groupName, currentUserId]
+    );
+
+    const group = groupRes.rows[0];
+
+    // Insert members into GroupMember
+    for (const uid of memberIds) {
+      await client.query(
+        `INSERT INTO GroupMember (group_id, user_id)
+         VALUES ($1, $2)
+         ON CONFLICT (group_id, user_id) DO NOTHING`,
+        [group.group_id, uid]
+      );
+    }
+
+    await client.query('COMMIT');
+    console.log('Group created', { group_id: group.group_id, name: group.name });
+    return res.status(201).json({ group_id: group.group_id, name: group.name });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error creating group', err);
+    return res.status(500).json({ message: 'Server error' });
+  } finally {
+    client.release();
+  }
 });
 
 // TODO: Fetch all groups of logged-in user
 app.get('/groups', checkAuth, async (req, res) => {
-  // TODO
+  try {
+    const currentUserId = req.session.user.user_id;
+    console.log('GET /groups for user', currentUserId);
+
+    const result = await pool.query(
+      `SELECT g.group_id, g.name
+       FROM Groups g
+       JOIN GroupMember gm ON gm.group_id = g.group_id
+       WHERE gm.user_id = $1
+       ORDER BY g.name`,
+      [currentUserId]
+    );
+
+    console.log('Groups count:', result.rowCount);
+    return res.status(200).json(result.rows);
+  } catch (err) {
+    console.error('Error fetching groups', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
 });
 
 // TODO: Fetch group details and members
 app.get('/groups/:id', checkAuth, async (req, res) => {
-  // TODO
+  const currentUserId = req.session.user.user_id;
+  const groupId = parseInt(req.params.id, 10);
+
+  if (!groupId || Number.isNaN(groupId)) {
+    return res.status(400).json({ message: 'Invalid group id' });
+  }
+
+  try {
+    // Fetch group
+    const groupRes = await pool.query(
+      `SELECT group_id, name, created_by
+       FROM Groups
+       WHERE group_id = $1`,
+      [groupId]
+    );
+
+    if (groupRes.rowCount === 0) {
+      return res.status(404).json({ message: 'Group not found' });
+    }
+
+    const group = groupRes.rows[0];
+
+    // Check that current user is a member of this group
+    const membershipRes = await pool.query(
+      `SELECT 1
+       FROM GroupMember
+       WHERE group_id = $1 AND user_id = $2`,
+      [groupId, currentUserId]
+    );
+
+    if (membershipRes.rowCount === 0) {
+      return res.status(403).json({ message: 'Not a member of this group' });
+    }
+
+    // Fetch members
+    const membersRes = await pool.query(
+      `SELECT u.user_id, u.username
+       FROM GroupMember gm
+       JOIN Users u ON u.user_id = gm.user_id
+       WHERE gm.group_id = $1
+       ORDER BY u.username`,
+      [groupId]
+    );
+
+    return res.status(200).json({ group, members: membersRes.rows });
+  } catch (err) {
+    console.error('Error fetching group details', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
 });
 
 // ---------------- EXPENSE ROUTES ----------------
 
 // TODO: Add an expense, splits, and update balances
 app.post('/expenses', checkAuth, async (req, res) => {
-  // TODO
+  const { group_id, description, amount, paid_by, splits } = req.body || {};
+  const groupId = parseInt(group_id, 10);
+  const paidById = parseInt(paid_by, 10);
+  const totalAmount = parseFloat(amount);
+
+  if (!groupId || Number.isNaN(groupId)) {
+    return res.status(400).json({ message: 'Invalid group_id' });
+  }
+  if (!paidById || Number.isNaN(paidById)) {
+    return res.status(400).json({ message: 'Invalid paid_by' });
+  }
+  if (!totalAmount || Number.isNaN(totalAmount) || totalAmount <= 0) {
+    return res.status(400).json({ message: 'Invalid amount' });
+  }
+  const desc = (description || '').toString().trim();
+  if (!desc) {
+    return res.status(400).json({ message: 'Description is required' });
+  }
+
+  if (!Array.isArray(splits) || splits.length === 0) {
+    return res.status(400).json({ message: 'Splits are required' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // 1. Insert expense
+    const expRes = await client.query(
+      `INSERT INTO Expense (group_id, paid_by, amount, description)
+       VALUES ($1, $2, $3, $4)
+       RETURNING expense_id`,
+      [groupId, paidById, totalAmount, desc]
+    );
+
+    const expenseId = expRes.rows[0].expense_id;
+
+    // 2. Insert splits and update balances
+    for (const s of splits) {
+      const userId = parseInt(s.user_id, 10);
+      const share = parseFloat(s.share_amount);
+
+      if (!userId || Number.isNaN(userId) || !share || Number.isNaN(share) || share <= 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'Invalid split entry' });
+      }
+
+      await client.query(
+        `INSERT INTO ExpenseSplit (expense_id, user_id, share_amount)
+         VALUES ($1, $2, $3)`,
+        [expenseId, userId, share]
+      );
+
+      // Update balances only for users other than the payer
+      if (userId !== paidById) {
+        await updateBalance(client, paidById, userId, share);
+      }
+    }
+
+    await client.query('COMMIT');
+    console.log('Expense created', { expense_id: expenseId, group_id: groupId });
+    return res.status(201).json({ expense_id: expenseId, message: 'Expense created' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error creating expense', err);
+    return res.status(500).json({ message: 'Server error' });
+  } finally {
+    client.release();
+  }
 });
 
 // TODO: Fetch expenses of a group
 app.get('/groups/:id/expenses', checkAuth, async (req, res) => {
-  // TODO
+  const groupId = parseInt(req.params.id, 10);
+
+  if (!groupId || Number.isNaN(groupId)) {
+    return res.status(400).json({ message: 'Invalid group id' });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT e.expense_id,
+              e.description,
+              e.amount,
+              e.paid_by,
+              u.username AS paid_by_name,
+              e.created_at
+       FROM Expense e
+       JOIN Users u ON u.user_id = e.paid_by
+       WHERE e.group_id = $1
+       ORDER BY e.created_at DESC`,
+      [groupId]
+    );
+
+    return res.status(200).json(result.rows);
+  } catch (err) {
+    console.error('Error fetching group expenses', err);
+    return res.status(500).json({ message: 'Server error' });
+  }
 });
 
 // ---------------- SETTLEMENT ROUTES ----------------

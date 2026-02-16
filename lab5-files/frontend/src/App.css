@@ -1,4 +1,431 @@
-/* You may style this component yourself.
+/* Layout & Navigation */
+
+nav.container {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 1rem 1.25rem;
+	margin-bottom: 1.5rem;
+	background-color: #ffffff;
+	border-radius: 12px;
+	box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+}
+
+.logo {
+	display: flex;
+	flex-direction: column;
+	gap: 0.15rem;
+}
+
+.logo .app-name,
+.logo strong {
+	font-weight: 700;
+	letter-spacing: 0.03em;
+}
+
+.logo .welcome {
+	font-size: 0.9rem;
+	color: #6b7280;
+}
+
+.nav-links {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+}
+
+.nav-links a {
+	font-size: 0.95rem;
+	font-weight: 500;
+	color: #374151;
+}
+
+.nav-links a:hover {
+	color: #111827;
+}
+
+.nav-links button {
+	border-radius: 999px;
+	padding: 0.35rem 0.9rem;
+	border: 1px solid #d1d5db;
+	background-color: #ffffff;
+	color: #374151;
+	cursor: pointer;
+	font-size: 0.9rem;
+}
+
+.nav-links button:hover {
+	background-color: #f3f4f6;
+}
+
+/* Login page */
+
+.login-container {
+	max-width: 400px;
+	margin: 4.5rem auto;
+	padding: 2.25rem 2rem 2rem;
+	background-color: #ffffff;
+	border-radius: 12px;
+	box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+}
+
+.login-container h2 {
+	text-align: center;
+	margin-bottom: 1.5rem;
+}
+
+.login-container form {
+	display: flex;
+	flex-direction: column;
+	gap: 0.9rem;
+}
+
+.login-container input {
+	padding: 0.6rem 0.7rem;
+	border-radius: 8px;
+	border: 1px solid #d1d5db;
+	font-size: 0.95rem;
+}
+
+.login-container input:focus {
+	outline: none;
+	border-color: #2563eb;
+	box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.login-container button[type='submit'] {
+	margin-top: 0.25rem;
+	padding: 0.6rem 0.7rem;
+	border-radius: 8px;
+	border: none;
+	background-color: #2563eb;
+	color: #ffffff;
+	font-weight: 600;
+	font-size: 0.95rem;
+	cursor: pointer;
+}
+
+.login-container button[type='submit']:hover {
+	background-color: #1d4ed8;
+}
+
+.login-container p {
+	margin-top: 1rem;
+	text-align: center;
+	font-size: 0.9rem;
+}
+
+.login-container p button {
+	margin-left: 0.25rem;
+	border: none;
+	background: none;
+	color: #2563eb;
+	cursor: pointer;
+	font-weight: 500;
+}
+
+/* Reusable elements */
+
+.primary-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0.55rem 1.15rem;
+	border-radius: 999px;
+	border: none;
+	background-color: #2563eb;
+	color: #ffffff;
+	font-size: 0.9rem;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.primary-btn:hover {
+	background-color: #1d4ed8;
+}
+
+button[type='button'] {
+	cursor: pointer;
+}
+
+.form-group {
+	display: flex;
+	flex-direction: column;
+	gap: 0.3rem;
+	margin-bottom: 0.9rem;
+}
+
+.form-group label {
+	font-size: 0.9rem;
+	font-weight: 500;
+	color: #4b5563;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+	padding: 0.55rem 0.65rem;
+	border-radius: 8px;
+	border: 1px solid #d1d5db;
+	font-size: 0.95rem;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+	outline: none;
+	border-color: #2563eb;
+	box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.actions {
+	display: flex;
+	gap: 0.75rem;
+	margin-top: 0.5rem;
+}
+
+.actions button[type='button'] {
+	padding: 0.45rem 1rem;
+	border-radius: 999px;
+	border: 1px solid #d1d5db;
+	background-color: #ffffff;
+	font-size: 0.9rem;
+}
+
+.actions button[type='button']:hover {
+	background-color: #f3f4f6;
+}
+
+/* Dashboard layout */
+
+.dashboard {
+	margin-top: 1.5rem;
+}
+
+.dashboard h2 {
+	margin-bottom: 1.25rem;
+}
+
+.dashboard section {
+	background-color: #ffffff;
+	border-radius: 12px;
+	padding: 1.25rem 1.3rem;
+	box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+	margin-bottom: 1.25rem;
+}
+
+.balances ul {
+	list-style: none;
+	padding: 0;
+	margin: 0.5rem 0 0;
+}
+
+.balance-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.55rem 0;
+	border-bottom: 1px solid #e5e7eb;
+	font-size: 0.94rem;
+}
+
+.balance-item:last-child {
+	border-bottom: none;
+}
+
+.balance-item .amount {
+	font-weight: 600;
+}
+
+.balance-item button {
+	margin-left: 0.75rem;
+	padding: 0.35rem 0.8rem;
+	border-radius: 999px;
+	border: none;
+	background-color: #059669;
+	color: #ffffff;
+	font-size: 0.8rem;
+	cursor: pointer;
+}
+
+.balance-item button:hover {
+	background-color: #047857;
+}
+
+.settle-form form {
+	margin-top: 0.75rem;
+}
+
+.quick-links .links {
+	display: flex;
+	flex-direction: column;
+	gap: 0.4rem;
+	margin-top: 0.5rem;
+}
+
+.quick-links .links a {
+	font-size: 0.92rem;
+}
+
+@media (min-width: 900px) {
+	.dashboard {
+		display: grid;
+		grid-template-columns: 2fr 1.5fr;
+		grid-template-areas:
+			'title title'
+			'balances settle'
+			'quick quick';
+		column-gap: 1.25rem;
+	}
+
+	.dashboard > h2 {
+		grid-area: title;
+	}
+
+	.dashboard .balances {
+		grid-area: balances;
+	}
+
+	.dashboard .settle-form {
+		grid-area: settle;
+	}
+
+	.dashboard .quick-links {
+		grid-area: quick;
+	}
+}
+
+/* Groups list */
+
+.groups-page {
+	margin-top: 1.5rem;
+}
+
+.groups-page h2 {
+	margin-bottom: 1rem;
+}
+
+.groups-page > .primary-btn {
+	margin-bottom: 1rem;
+}
+
+.groups-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	background-color: #ffffff;
+	border-radius: 12px;
+	box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+.group-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0.9rem 1rem;
+	border-bottom: 1px solid #e5e7eb;
+}
+
+.group-item:last-child {
+	border-bottom: none;
+}
+
+.group-item a {
+	font-weight: 500;
+	color: #111827;
+}
+
+/* Create Group */
+
+.create-group-page {
+	margin-top: 1.5rem;
+}
+
+.create-group-form {
+	margin-top: 0.75rem;
+	background-color: #ffffff;
+	border-radius: 12px;
+	padding: 1.25rem 1.3rem;
+	box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+
+.friend-checkboxes {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.friend-checkboxes label {
+	font-size: 0.95rem;
+}
+
+/* Group Details */
+
+.group-details-page {
+	margin-top: 1.5rem;
+}
+
+.group-details-page h2 {
+	margin-bottom: 1rem;
+}
+
+.group-details-page section {
+	background-color: #ffffff;
+	border-radius: 12px;
+	padding: 1.25rem 1.3rem;
+	box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+	margin-bottom: 1.25rem;
+}
+
+.member-checkboxes {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem 1rem;
+}
+
+.member-checkboxes label {
+	font-size: 0.9rem;
+}
+
+.add-expense form {
+	margin-top: 0.5rem;
+}
+
+.settle-up-group form {
+	margin-top: 0.5rem;
+}
+
+.hint {
+	font-size: 0.8rem;
+	color: #6b7280;
+}
+
+.expenses-history ul {
+	list-style: none;
+	padding: 0;
+	margin: 0.5rem 0 0;
+}
+
+.expenses-history li {
+	padding: 0.6rem 0;
+	border-bottom: 1px solid #e5e7eb;
+	font-size: 0.9rem;
+}
+
+.expenses-history li:last-child {
+	border-bottom: none;
+}
+
+/* Friends page basic layout (if used) */
+
+.friends-page section {
+	background-color: #ffffff;
+	border-radius: 12px;
+	padding: 1.25rem 1.3rem;
+	box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+	margin-bottom: 1.25rem;
+}
+
 
 
 
